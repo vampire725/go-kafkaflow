@@ -28,3 +28,5 @@ func (e *Event) Ack() {
 
 type DestFunc func(chan *Event)
 type SourceFunc func() chan *Event
+type MapFunc func(event *Event) (*Event, bool, error)
+type WindowFunc func(events []*Event) ([]*Event, bool, error)

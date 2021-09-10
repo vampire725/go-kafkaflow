@@ -1,6 +1,9 @@
 package kafkastreams
 
-import "log"
+import (
+	"github.com/go-kit/kit/log"
+	"time"
+)
 
 /*
  * @Author: Gpp
@@ -18,43 +21,31 @@ type Pipeline struct {
 	EnableTimeLog bool
 }
 
-type PipelineManger struct {
-	Source      SourceFunc
-	Pipelines   map[string]*Pipeline
-	Destination DestFunc
+func NewPipeline(logger log.Logger, source SourceFunc, destination DestFunc, enableTimeLogMiddleware bool) *Pipeline {
+	return &Pipeline{
+		Source:        source,
+		Handlers:      make([]Handler, 0),
+		Destination:   destination,
+		Logger:        logger,
+		EnableTimeLog: enableTimeLogMiddleware,
+	}
 }
 
-//func NewPipeline()*Pipeline {
-//
-//}
+func (p *Pipeline) Map(f MapFunc, limit int, name string) *Pipeline {
 
-func (p *PipelineManger) Start() {
-	var input chan *Event
-	go func() {
-		for _, s := range p.Pipelines {
-			go func(s *Pipeline) {
-				for {
-					in := s.Input
-					out := s.Output
-					for _, h := range s.Handlers {
-						// out是每次handler处理后的数据
-						out = make(chan *Event)
-						h.Init(in, out)
-						in = out
-					}
-					// 存储最终处理完成的out
-					p.Destination(out)
-				}
-			}(s)
-		}
-	}()
+	p.Handlers = append(p.Handlers, mapHandler{
+		limit: limit,
+		f:     f,
+	})
+	return p
+}
 
-	for {
-		// 监听Kafka消费，消费的数据都放到input channel里
-		input = p.Source()
-		for e := range input {
-			// pipeline manager根据不同的topic分发pipeline
-			p.Pipelines[e.RawMessage.Topic].Input <- e
-		}
-	}
+func (p *Pipeline) Window(f WindowFunc, limit int, duration time.Duration, size int, name string) *Pipeline {
+	p.Handlers = append(p.Handlers, &windowHandler{
+		limit:    limit,
+		duration: duration,
+		size:     size,
+		f:        f,
+	})
+	return p
 }
