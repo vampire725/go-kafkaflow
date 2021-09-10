@@ -6,7 +6,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"kafkastreams/configutil"
+	"go-kafkastreams/configutil"
 	"strings"
 )
 

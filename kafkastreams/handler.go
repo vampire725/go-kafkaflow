@@ -23,7 +23,7 @@ func (h mapHandler) Init(input, output chan *Event) {
 	for i := 0; i < h.limit; i++ {
 		go func() {
 			for e := range input {
-				if e, ok, err := h.f(e); ok && err != nil {
+				if e, ok, err := h.f(e); ok && err == nil {
 					output <- e
 				} else if e != nil {
 					e.Ack()
