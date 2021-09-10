@@ -49,3 +49,16 @@ func (p *Pipeline) Window(f WindowFunc, limit int, duration time.Duration, size 
 	})
 	return p
 }
+
+func (p *Pipeline) Start() {
+	var output, input chan *Event
+	for {
+		input = p.Source()
+		for _, h := range p.Handlers {
+			output = make(chan *Event)
+			h.Init(input, output)
+			input = output
+		}
+		p.Destination(output)
+	}
+}

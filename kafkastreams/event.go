@@ -26,6 +26,12 @@ func (e *Event) Ack() {
 	close(e.Reply)
 }
 
+func EventsAck(events []*Event) {
+	for _, e := range events {
+		e.Ack()
+	}
+}
+
 type DestFunc func(chan *Event)
 type SourceFunc func() chan *Event
 type MapFunc func(event *Event) (*Event, bool, error)
