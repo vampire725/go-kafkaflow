@@ -6,6 +6,8 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"kafkastreams/configutil"
+	"strings"
 )
 
 /*
@@ -76,7 +78,13 @@ func (h *TopicHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 	return session.Context().Err()
 }
 
-func NewKafkaSource(logger log.Logger, consumerGroup sarama.ConsumerGroup, topics []string, waitAckSize int) SourceFunc {
+func NewKafkaSource(logger log.Logger, kafka configutil.KafkaConfig, topics []string, waitAckSize int) (SourceFunc, error) {
+	kafkaConfig := configutil.NewKafkaConfig(kafka)
+	consumerGroup, err := sarama.NewConsumerGroup(strings.Split(kafka.Dsn, ","), kafka.ConsumerGroupId, kafkaConfig)
+	if err != nil {
+		_ = level.Error(logger).Log("err", "err in create consumer group", "consumer group id", kafka.ConsumerGroupId)
+		return nil, err
+	}
 	return func() chan *Event {
 		out := make(chan *Event)
 		go func() {
@@ -90,5 +98,5 @@ func NewKafkaSource(logger log.Logger, consumerGroup sarama.ConsumerGroup, topic
 			}
 		}()
 		return out
-	}
+	}, nil
 }
