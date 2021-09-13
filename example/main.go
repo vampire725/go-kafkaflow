@@ -46,28 +46,62 @@ func main() {
 
 	{
 		// 每一个管道都有自己对应的数据来源（Kafka），使用消费者组模式获取数据
-		textSource, err := kafkastreams.NewKafkaSource(logger, cfg.Kafka, []string{"test0"}, 5)
+		textSource0, err := kafkastreams.NewKafkaSource(logger, cfg.Kafka, []string{"test0"}, 5)
 		if err != nil {
 			os.Exit(1)
 		}
 		// 初始化管道
-		p := kafkastreams.NewPipeline(logger, textSource, destination, true)
-		// 实现map和window
-		p.Map(toUpper, 5, "test0").Window(toWindow, 5, time.Second*5, 5, "window")
+		p := kafkastreams.NewPipeline(logger, textSource0, destination, true)
+		// 实现map
+		p.Map(toUpper, 5, "test0")
 		// 管道启动
 		go p.Start()
 	}
 
 	{
-		source, err := kafkastreams.NewKafkaSource(logger, cfg.Kafka, []string{"test1"}, 5)
+		textSource1, err := kafkastreams.NewKafkaSource(logger, cfg.Kafka, []string{"test1"}, 5)
 		if err != nil {
 			os.Exit(1)
 		}
-		p := kafkastreams.NewPipeline(logger, source, destination, true)
-		p.Map(toUpper, 5, "test1").Window(toWindow, 5, time.Second*5, 5, "test1window")
+		p := kafkastreams.NewPipeline(logger, textSource1, destination, true)
+		// 实现window
+		p.Window(toWindow, 5, time.Second*5, 5, "test1window")
+		go p.Start()
+	}
+
+	{
+		textSource2, err := kafkastreams.NewKafkaSource(logger, cfg.Kafka, []string{"test2"}, 5)
+		if err != nil {
+			os.Exit(1)
+		}
+		p := kafkastreams.NewPipeline(logger, textSource2, destination, true)
+		//实现map和window
+		p.Map(toUpper, 5, "test2").Window(toWindow, 5, time.Second*5, 5, "test2window")
 		go p.Start()
 	}
 	wait()
+}
+
+var toUpper = func(event *kafkastreams.Event) (*kafkastreams.Event, bool, error) {
+	// 每一次处理后的数据放在event.Data里，最后需要保存到Kafka的数据放在event.SaveEvents
+	event.Data = map[string]string{string(event.RawMessage.Value): strings.ToUpper(string(event.RawMessage.Value))}
+	event.SaveEvents = append(event.SaveEvents, kafkastreams.SaveEvent{
+		// 添加事件，事件对应topic
+		Event: Event0,
+		Value: event.Data,
+	})
+	return event, true, nil
+}
+
+var toWindow = func(events []*kafkastreams.Event) ([]*kafkastreams.Event, bool, error) {
+	for _, e := range events {
+		e.Data = map[string]string{string(e.RawMessage.Value): fmt.Sprintf("测试成功:%v", string(e.RawMessage.Value))}
+		e.SaveEvents = append(e.SaveEvents, kafkastreams.SaveEvent{
+			Event: Event1,
+			Value: e.Data,
+		})
+	}
+	return events, true, nil
 }
 
 func wait() {
@@ -77,28 +111,4 @@ func wait() {
 	case <-c:
 		return
 	}
-}
-
-var toUpper = func(event *kafkastreams.Event) (*kafkastreams.Event, bool, error) {
-	event.Data = []byte(strings.ToUpper(string(event.RawMessage.Value)))
-	event.SaveEvents = append(event.SaveEvents, kafkastreams.SaveEvent{
-		Event: Event0,
-		Value: event.Data,
-	})
-	return event, true, nil
-}
-
-var toWindow = func(events []*kafkastreams.Event) ([]*kafkastreams.Event, bool, error) {
-	for _, e := range events {
-		var str string
-		d := e.Data.([]byte)
-		str = string(d)
-		e.Data = fmt.Sprintf("测试成功:%v", str)
-		fmt.Println(e.Data)
-		e.SaveEvents = append(e.SaveEvents, kafkastreams.SaveEvent{
-			Event: Event1,
-			Value: d,
-		})
-	}
-	return events, true, nil
 }
